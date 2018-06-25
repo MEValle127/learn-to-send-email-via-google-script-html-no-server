@@ -93,21 +93,47 @@ function record_data(e) {
     var sheet   = doc.getSheetByName(sheetName);
     
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var newHeader = headers.slice();
+    var headersFromForm = getDataColumns(e.parameters);
     var nextRow = sheet.getLastRow()+1; // get next row
     var row     = [ new Date() ]; // first element in the row should always be a timestamp
     // loop through the header columns
     for (var i = 1; i < headers.length; i++) { // start at 1 to avoid Timestamp column
-      if(headers[i].length > 0) {
-        var values = e.parameters[headers[i]];
+      var headerName = headers[i];
+      var indexInFormArray = headersFromForm.indexOf(headerName);
+      if(headerName.length > 0) {
+        var values = e.parameters[headerName];
         var output = values[0];
         for (var j = 1; j < values.length; j++) {
           output += ', ' + values[j];
         }
         row.push(output); // add data to row
       }
+      if (indexInFormArray > -1) {
+        headersFromForm.splice(indexInFormArray); // mark as stored by removing from form headers
+      }
     }
+
+    // set any additional headers in our form
+    // TODO clean this up, a bit repeated from logic above...
+    for (var i = 0; i < headersFromForm.length; i++) {
+      var newHeaderName = headersFromForm[i];
+      if (newHeaderName.length > 0) {
+        newHeader.push(newHeaderName);
+        var values = e.parameters[newHeaderName];
+        var output = values.join(', ');
+        row.push(output);
+      }
+    }
+
     // more efficient to set values as [][] array than individually
     sheet.getRange(nextRow, 1, 1, row.length).setValues([row]);
+
+    // update header row with any new data
+    var headerChanged = newHeader.length !== header.length;
+    if (headerChanged) {
+      sheet.getRange(1, 1, 1, newHeader.length).setValues([newHeader]);
+    }
   }
   catch(error) {
     Logger.log(error);
@@ -116,4 +142,10 @@ function record_data(e) {
     return;
   }
 
+}
+
+function getDataColumns(data) {
+  Object.keys(data).filter(column => {
+    return !(column === 'formDataNameOrder' || column === 'formGooglSheetName' || column === 'formGoogleSendEmail' || column === 'honeypot');
+  });
 }
